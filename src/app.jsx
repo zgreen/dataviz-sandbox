@@ -12,40 +12,29 @@ import {
   VictoryTooltip
 } from 'victory'
 
+import StateSelect from './StateSelect'
+
 class Main extends React.Component {
   constructor (props) {
     super(props)
     this.calcSlope = this.calcSlope.bind(this)
     this.formulateLabel = this.formulateLabel.bind(this)
+    this.getData = this.getData.bind(this)
     this.toggleCelcius = this.toggleCelcius.bind(this)
     this.state = {
+      curState: 37,
       data: [],
       useFarenheight: true,
       displayTrend: false,
       desc: {}
     }
   }
+
   componentDidMount () {
-    fetch('http://www.ncdc.noaa.gov/cag/time-series/us/37/00/tavg/ytd/12/1895-2016.json?base_prd=true&begbaseyear=1895&endbaseyear=2016')
-      .then((resp) => resp.json())
-      .then((body) => {
-        const yearMonths = Object.keys(body.data)
-        this.setState({ data: yearMonths.map((yearMonth) => {
-          const temp = !this.state.useFarenheight
-            ? (body.data[yearMonth].value - 32) * (5 / 9)
-            : body.data[yearMonth].value
-          return {
-            temp: parseInt(temp, 10),
-            year: yearMonth.substring(0, 4),
-            label: `${yearMonth.substring(0, 4)}: ${temp}°${this.state.useFarenheight ? 'F' : 'C'}`
-          }
-        })})
-        this.setState({ desc: body.description })
-      })
+    this.getData(this.state.curState)
   }
 
   calcSlope (data) {
-    const numPoints = this.state.data.length
     const xVals = data.map((dataPoint, idx) => idx)
     const yVals = data.map((dataPoint) => dataPoint.temp)
     const a = data.length * (
@@ -67,8 +56,27 @@ class Main extends React.Component {
   }
 
   formulateLabel (year, yearMonth, temp) {
-    const strYear = year ? year : yearMonth;
+    const strYear = year ? year : yearMonth
     return `${strYear.substring(0, 4)}: ${temp}°${this.state.useFarenheight ? 'F' : 'C'}`
+  }
+
+  getData (stateCode) {
+    fetch(`http://www.ncdc.noaa.gov/cag/time-series/us/${stateCode}/00/tavg/ytd/12/1895-2016.json?base_prd=true&begbaseyear=1895&endbaseyear=2016`)
+      .then((resp) => resp.json())
+      .then((body) => {
+        const yearMonths = Object.keys(body.data)
+        this.setState({ data: yearMonths.map((yearMonth) => {
+          const temp = !this.state.useFarenheight
+            ? (body.data[yearMonth].value - 32) * (5 / 9)
+            : body.data[yearMonth].value
+          return {
+            temp: parseInt(temp, 10),
+            year: yearMonth.substring(0, 4),
+            label: `${yearMonth.substring(0, 4)}: ${temp}°${this.state.useFarenheight ? 'F' : 'C'}`
+          }
+        })})
+        this.setState({ desc: body.description })
+      })
   }
 
   setDomain (data = [], forY = true) {
@@ -101,7 +109,7 @@ class Main extends React.Component {
       return {
         temp,
         label: this.formulateLabel(dataPoint.year, null, temp),
-        year: dataPoint.year,
+        year: dataPoint.year
       }
     })})
   }
@@ -109,77 +117,82 @@ class Main extends React.Component {
   render () {
     return (
       <div>
-        <linearGradient id="gradient">
-          <stop offset="0%" stopColor="red"/>
-          <stop offset="50%" stopColor="blue"/>
+        <linearGradient id='gradient'>
+          <stop offset='0%' stopColor='red' />
+          <stop offset='50%' stopColor='blue' />
         </linearGradient>
-        <form action="">
+        <form action=''>
           <label>Use Celcius</label>
           <input
-            type="checkbox"
+            type='checkbox'
             checked={!this.state.useFarenheight}
-            onChange={this.toggleCelcius}/>
+            onChange={this.toggleCelcius} />
           <label>Display Trend</label>
           <input
-            type="checkbox"
+            type='checkbox'
             checked={this.state.displayTrend}
-            onChange={() => this.setState({ displayTrend: !this.state.displayTrend })}/>
+            onChange={() => this.setState({ displayTrend: !this.state.displayTrend })}
+          />
         </form>
+        <StateSelect
+          curState={this.state.curState}
+          getData={this.getData}
+        />
         {!this.state.data.length
           ? 'Loading...'
           : <div>
-          <h1>{`${this.state.desc.title}, ${this.state.desc.base_period}`}</h1>
-          <VictoryChart containerComponent={<VictoryContainer title="Chart of Dog Breeds" desc="This chart shows how popular each dog breed is by percentage in Seattle." />}>
-            <VictoryAxis
-              fixLabelOverlap
-            />
-            <VictoryAxis
-              dependentAxis
-              fixLabelOverlap
-            />
+            <h1>{`${this.state.desc.title}, ${this.state.desc.base_period}`}</h1>
+            <VictoryChart containerComponent={<VictoryContainer title='Chart of Dog Breeds' desc='This chart shows how popular each dog breed is by percentage in Seattle.' />}>
+              <VictoryAxis
+                fixLabelOverlap
+              />
+              <VictoryAxis
+                dependentAxis
+                fixLabelOverlap
+              />
 
-            <VictoryLine
-              data={[
-                {x: this.state.data[0].year, y: (this.calcSlope(this.state.data) * 0) + this.calcYInt(this.state.data)},
-                {x: this.state.data[this.state.data.length - 1].year, y: (this.calcSlope(this.state.data) * (this.state.data.length - 1)) + this.calcYInt(this.state.data)}
-              ]}
-              style={{
-                data: {opacity: this.state.displayTrend ? 1 : 0}
-              }}
-            />
-
-            <VictoryGroup
-              data={this.state.data}
-              x={'year'}
-              y={'temp'}
-              style={{
-                data: {opacity: 0.7}
-              }}
-              scale={{x: 'time', y: 'linear'}}
-              domain={{y: [
-                this.state.data.reduce((prev, cur) => prev.temp < cur.temp ? prev : cur).temp,
-                this.state.data.reduce((prev, cur) => prev.temp > cur.temp ? prev : cur, { temp: 0 }).temp
-              ]}}
-            >
-              <VictoryArea
+              <VictoryLine
+                data={[
+                  {x: this.state.data[0].year, y: (this.calcSlope(this.state.data) * 0) + this.calcYInt(this.state.data)},
+                  {x: this.state.data[this.state.data.length - 1].year, y: (this.calcSlope(this.state.data) * (this.state.data.length - 1)) + this.calcYInt(this.state.data)}
+                ]}
                 style={{
-                  data: {
-                    fill: 'tomato',
-                    stroke: 'red'
-                  }
+                  data: {opacity: this.state.displayTrend ? 1 : 0}
                 }}
               />
-              <VictoryScatter
-                labelComponent={<VictoryTooltip />}
-                size={2}
+
+              <VictoryGroup
+                data={this.state.data}
+                x={'year'}
+                y={'temp'}
                 style={{
-                  data: {
-                    fill: 'tomato',
-                  }
+                  data: {opacity: 0.7}
                 }}
-              />
-            </VictoryGroup>
-          </VictoryChart>
+                scale={{x: 'time', y: 'linear'}}
+                domain={{y: [
+                  this.state.data.reduce((prev, cur) => prev.temp < cur.temp ? prev : cur).temp,
+                  this.state.data.reduce((prev, cur) => prev.temp > cur.temp ? prev : cur, { temp: 0 }).temp
+                ]}}
+              >
+                <VictoryArea
+                  style={{
+                    data: {
+                      fill: 'tomato',
+                      stroke: 'red'
+                    }
+                  }}
+                />
+                <VictoryScatter
+                  labelComponent={<VictoryTooltip />}
+                  size={2}
+                  style={{
+                    data: {
+                      fill: 'tomato'
+                    }
+                  }}
+                />
+              </VictoryGroup>
+            </VictoryChart>
           </div>
         }
       </div>
