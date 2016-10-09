@@ -16,6 +16,7 @@ class Main extends React.Component {
   constructor (props) {
     super(props)
     this.calcSlope = this.calcSlope.bind(this)
+    this.formulateLabel = this.formulateLabel.bind(this)
     this.toggleCelcius = this.toggleCelcius.bind(this)
     this.state = {
       data: [],
@@ -25,7 +26,7 @@ class Main extends React.Component {
     }
   }
   componentDidMount () {
-    fetch('http://www.ncdc.noaa.gov/cag/time-series/us/37/USW00014765/tavg/ytd/12/1895-2016.json?base_prd=true&begbaseyear=1948&endbaseyear=2015')
+    fetch('http://www.ncdc.noaa.gov/cag/time-series/us/37/00/tavg/ytd/12/1895-2016.json?base_prd=true&begbaseyear=1895&endbaseyear=2016')
       .then((resp) => resp.json())
       .then((body) => {
         const yearMonths = Object.keys(body.data)
@@ -34,9 +35,9 @@ class Main extends React.Component {
             ? (body.data[yearMonth].value - 32) * (5 / 9)
             : body.data[yearMonth].value
           return {
-            temp,
+            temp: parseInt(temp, 10),
             year: yearMonth.substring(0, 4),
-            label: `${yearMonth.substring(0, 4)}: ${Math.floor(temp)}°${this.state.useFarenheight ? 'F' : 'C'}`
+            label: `${yearMonth.substring(0, 4)}: ${temp}°${this.state.useFarenheight ? 'F' : 'C'}`
           }
         })})
         this.setState({ desc: body.description })
@@ -65,6 +66,11 @@ class Main extends React.Component {
     return (sum - f) / data.length
   }
 
+  formulateLabel (year, yearMonth, temp) {
+    const strYear = year ? year : yearMonth;
+    return `${strYear.substring(0, 4)}: ${temp}°${this.state.useFarenheight ? 'F' : 'C'}`
+  }
+
   setDomain (data = [], forY = true) {
     return [].concat(forY
       ? [
@@ -89,12 +95,14 @@ class Main extends React.Component {
   toggleCelcius () {
     this.setState({ useFarenheight: !this.state.useFarenheight })
     this.setState({ data: this.state.data.map((dataPoint) => {
-      return Object.assign({},
-        dataPoint,
-        { temp: !this.state.useFarenheight
-          ? (dataPoint.temp - 32) * (5 / 9)
-          : dataPoint.temp + 32 * (9 / 5) }
-      )
+      const temp = !this.state.useFarenheight
+        ? (dataPoint.temp * (9 / 5) + 32)
+        : (dataPoint.temp - 32) * (5 / 9)
+      return {
+        temp,
+        label: this.formulateLabel(dataPoint.year, null, temp),
+        year: dataPoint.year,
+      }
     })})
   }
 
@@ -128,17 +136,19 @@ class Main extends React.Component {
             <VictoryAxis
               dependentAxis
               fixLabelOverlap
-              domain={[
-                this.state.data
-                  .map((dataPoint) => dataPoint.temp)
-                  .reduce((prev, cur) => prev < cur ? prev : cur, 0),
-                this.state.data
-                  .map((dataPoint) => dataPoint.temp)
-                  .reduce((prev, cur) => prev > cur ? prev : cur, 0)
-              ]}
             />
+
+            <VictoryLine
+              data={[
+                {x: this.state.data[0].year, y: (this.calcSlope(this.state.data) * 0) + this.calcYInt(this.state.data)},
+                {x: this.state.data[this.state.data.length - 1].year, y: (this.calcSlope(this.state.data) * (this.state.data.length - 1)) + this.calcYInt(this.state.data)}
+              ]}
+              style={{
+                data: {opacity: this.state.displayTrend ? 1 : 0}
+              }}
+            />
+
             <VictoryGroup
-              dataComponent
               data={this.state.data}
               x={'year'}
               y={'temp'}
@@ -146,9 +156,10 @@ class Main extends React.Component {
                 data: {opacity: 0.7}
               }}
               scale={{x: 'time', y: 'linear'}}
-              domain={{
-                y: this.setDomain(this.state.data)
-              }}
+              domain={{y: [
+                this.state.data.reduce((prev, cur) => prev.temp < cur.temp ? prev : cur).temp,
+                this.state.data.reduce((prev, cur) => prev.temp > cur.temp ? prev : cur, { temp: 0 }).temp
+              ]}}
             >
               <VictoryArea
                 style={{
