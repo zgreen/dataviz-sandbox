@@ -14,9 +14,14 @@ class StateSelect extends React.Component {
 
   render () {
     return (
-      <select onChange={this.handleStateUpdate}>
+      <select
+        onChange={this.handleStateUpdate}
+        defaultValue={this.props.curState}
+      >
         {Object.keys(states).map((stateName) =>
-          <option selected={this.props.curState === states[stateName]} value={states[stateName]}>{stateName}</option>)}
+          <option
+            key={states[stateName]}
+            value={states[stateName]}>{stateName}</option>)}
       </select>
     )
   }

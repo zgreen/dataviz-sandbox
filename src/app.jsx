@@ -18,15 +18,19 @@ class Main extends React.Component {
   constructor (props) {
     super(props)
     this.calcSlope = this.calcSlope.bind(this)
+    this.clearSavedData = this.clearSavedData.bind(this)
     this.formulateLabel = this.formulateLabel.bind(this)
     this.getData = this.getData.bind(this)
     this.toggleCelcius = this.toggleCelcius.bind(this)
+    this.toggleAvgByDecade = this.toggleAvgByDecade.bind(this)
     this.state = {
       curState: 37,
       data: [],
       useFarenheight: true,
       displayTrend: false,
-      desc: {}
+      desc: {},
+      displayAvgByDecade: false,
+      gettingNewData: false,
     }
   }
 
@@ -55,28 +59,30 @@ class Main extends React.Component {
     return (sum - f) / data.length
   }
 
+  clearSavedData () {
+    window.localStorage.clear()
+  }
+
   formulateLabel (year, yearMonth, temp) {
     const strYear = year ? year : yearMonth
     return `${strYear.substring(0, 4)}: ${temp}°${this.state.useFarenheight ? 'F' : 'C'}`
   }
 
   getData (stateCode) {
-    fetch(`http://www.ncdc.noaa.gov/cag/time-series/us/${stateCode}/00/tavg/ytd/12/1895-2016.json?base_prd=true&begbaseyear=1895&endbaseyear=2016`)
-      .then((resp) => resp.json())
-      .then((body) => {
-        const yearMonths = Object.keys(body.data)
-        this.setState({ data: yearMonths.map((yearMonth) => {
-          const temp = !this.state.useFarenheight
-            ? (body.data[yearMonth].value - 32) * (5 / 9)
-            : body.data[yearMonth].value
-          return {
-            temp: parseInt(temp, 10),
-            year: yearMonth.substring(0, 4),
-            label: `${yearMonth.substring(0, 4)}: ${temp}°${this.state.useFarenheight ? 'F' : 'C'}`
-          }
-        })})
-        this.setState({ desc: body.description })
-      })
+    this.setState({ curState: stateCode })
+    const savedState = window.localStorage.getItem(`state${stateCode}`)
+    if (savedState) {
+      this.updateFromData(JSON.parse(savedState))
+    } else {
+      this.setState({ gettingNewData: true })
+      fetch(`http://www.ncdc.noaa.gov/cag/time-series/us/${stateCode}/00/tavg/ytd/12/1895-2016.json?base_prd=true&begbaseyear=1895&endbaseyear=2016`)
+        .then((resp) => resp.json())
+        .then((body) => {
+          this.setState({ gettingNewData: false })
+          this.updateFromData(body)
+          window.localStorage.setItem(`state${stateCode}`, JSON.stringify(body))
+        })
+    }
   }
 
   setDomain (data = [], forY = true) {
@@ -114,31 +120,90 @@ class Main extends React.Component {
     })})
   }
 
+  toggleAvgByDecade () {
+    this.setState({ displayAvgByDecade: !this.state.displayAvgByDecade },
+      () => {
+        if (this.state.displayAvgByDecade) {
+          const result = this.state.data
+            .filter((dataPoint, idx) => {
+              return idx === 0 || dataPoint.year % 10 === 0
+            })
+            .map((decade) => parseInt(decade.year, 10))
+            .map((decade, idx) => {
+              const remainingYears = decade % 10 !== 0
+                ? (decade % 10) - 1
+                : 9
+              return this.state.data
+                .slice(idx, idx + remainingYears)
+                .reduce((prev, cur, _idx, arr) => {
+                  const temp = (_idx + 1) === arr.length
+                    ? (prev.temp + cur.temp) / arr.length
+                    : (prev.temp + cur.temp)
+                  return {
+                    year: decade.toString(),
+                    temp,
+                    label: `${decade}-${decade + remainingYears}: ${temp}`
+                  }
+                }, { temp: 0 })
+            })
+          this.setState({ data: result })
+        } else {
+          this.getData(this.state.curState)
+        }
+    })
+  }
+
+  updateFromData (data) {
+    const yearMonths = Object.keys(data.data)
+    this.setState({ data: yearMonths.map((yearMonth) => {
+      const temp = !this.state.useFarenheight
+        ? (data.data[yearMonth].value - 32) * (5 / 9)
+        : data.data[yearMonth].value
+      return {
+        temp: parseInt(temp, 10),
+        year: yearMonth.substring(0, 4),
+        label: `${yearMonth.substring(0, 4)}: ${temp}°${this.state.useFarenheight ? 'F' : 'C'}`
+      }
+    })})
+    this.setState({ desc: data.description })
+  }
+
   render () {
     return (
       <div>
-        <linearGradient id='gradient'>
-          <stop offset='0%' stopColor='red' />
-          <stop offset='50%' stopColor='blue' />
-        </linearGradient>
+        <svg style={{height: '0', width: '0'}}>
+          <defs>
+            <linearGradient id='gradient' x1='0' x2='0' y1='0' y2='1'>
+              <stop offset='50%' stopColor='#FF4136' />
+              <stop offset='100%' stopColor='#0074D9' />
+            </linearGradient>
+          </defs>
+        </svg>
         <form action=''>
           <label>Use Celcius</label>
           <input
             type='checkbox'
             checked={!this.state.useFarenheight}
-            onChange={this.toggleCelcius} />
+            onChange={this.toggleCelcius}
+          />
           <label>Display Trend</label>
           <input
             type='checkbox'
             checked={this.state.displayTrend}
             onChange={() => this.setState({ displayTrend: !this.state.displayTrend })}
           />
+          <label>Display Average By Decade</label>
+          <input
+            type='checkbox'
+            onChange={this.toggleAvgByDecade}
+          />
         </form>
         <StateSelect
           curState={this.state.curState}
           getData={this.getData}
         />
-        {!this.state.data.length
+        <button onClick={this.clearSavedData}>Clear saved data</button>
+        {!this.state.data.length || this.state.gettingNewData
           ? 'Loading...'
           : <div>
             <h1>{`${this.state.desc.title}, ${this.state.desc.base_period}`}</h1>
@@ -177,7 +242,7 @@ class Main extends React.Component {
                 <VictoryArea
                   style={{
                     data: {
-                      fill: 'tomato',
+                      fill: 'url(#gradient)',
                       stroke: 'red'
                     }
                   }}

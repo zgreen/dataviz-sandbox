@@ -10,7 +10,7 @@ var isHot = process.argv.indexOf('--hot') !== -1;
 
 module.exports = {
   entry: {
-    app: 'src/app.jsx',
+    app: 'src/App.jsx',
   },
   output: {
     path: 'build',
