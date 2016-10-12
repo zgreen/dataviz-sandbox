@@ -30,7 +30,7 @@ class Main extends React.Component {
       displayTrend: false,
       desc: {},
       displayAvgByDecade: false,
-      gettingNewData: false,
+      gettingNewData: false
     }
   }
 
@@ -150,7 +150,7 @@ class Main extends React.Component {
         } else {
           this.getData(this.state.curState)
         }
-    })
+      })
   }
 
   updateFromData (data) {
@@ -258,6 +258,11 @@ class Main extends React.Component {
                 />
               </VictoryGroup>
             </VictoryChart>
+            <small>
+              <p>Disclaimer: this project is a work-in-progress, and exists primarily so that I can teach myself Victory.js. The way the data is presented may not be accurate.</p>
+              <p>Everything is sourced from:</p>
+              <p>NOAA National Centers for Environmental information, Climate at a Glance: U.S. Time Series, published October 2016, retrieved on October 11, 2016 from http://www.ncdc.noaa.gov/cag/</p>
+            </small>
           </div>
         }
       </div>
