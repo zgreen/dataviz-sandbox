@@ -75,7 +75,7 @@ class Main extends React.Component {
       this.updateFromData(JSON.parse(savedState))
     } else {
       this.setState({ gettingNewData: true })
-      fetch(`http://www.ncdc.noaa.gov/cag/time-series/us/${stateCode}/00/tavg/ytd/12/1895-2016.json?base_prd=true&begbaseyear=1895&endbaseyear=2016`)
+      fetch(`https://www.ncdc.noaa.gov/cag/time-series/us/${stateCode}/00/tavg/ytd/12/1895-2016.json?base_prd=true&begbaseyear=1895&endbaseyear=2016`)
         .then((resp) => resp.json())
         .then((body) => {
           this.setState({ gettingNewData: false })
